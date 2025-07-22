@@ -122,3 +122,103 @@ public protocol KeychainStorageProtocol {
     /// - Throws: An error only if the item exists but removal fails.
     func delete(_ account: Account) throws(KeychainError)
 }
+
+public extension KeychainStorageProtocol {
+    /// Retrieves a UTF-8 encoded string stored in the keychain for the specified account.
+    ///
+    /// - Parameter account: The account identifier used to locate the stored value.
+    /// - Returns: A string decoded from the keychain data using UTF-8 encoding.
+    /// - Throws: ``KeychainError/unexpectedData`` if the data cannot be decoded as UTF-8.
+    /// - Throws: Any error thrown by ``KeychainStorageProtocol/get(_:)-2gcee``
+    ///   if reading the raw data fails.
+    func get(_ account: Account) throws(KeychainError) -> String {
+        guard let value = String(data: try get(account), encoding: .utf8) else {
+            throw KeychainError.unexpectedData
+        }
+        return value
+    }
+    
+    /// Retrieves a `UUID` stored in the keychain for the specified account.
+    ///
+    /// - Parameter account: The account identifier used to locate the stored value.
+    /// - Returns: A UUID decoded from the keychain string.
+    /// - Throws: ``KeychainError/unexpectedData`` if the stored string is missing or invalid.
+    /// - Throws: Any error thrown by ``KeychainStorageProtocol/get(_:)-23z7h``
+    ///   if reading the string from the keychain fails.
+    func get(_ account: Account) throws(KeychainError) -> UUID {
+        guard let value = UUID(uuidString: try get(account)) else {
+            throw KeychainError.unexpectedData
+        }
+        return value
+    }
+    
+    /// Retrieves a value of type `T` stored in the keychain and decodes it from JSON using the given decoder.
+    ///
+    /// - Parameters:
+    ///   - account: The account identifier used to locate the stored value.
+    ///   - decoder: The `JSONDecoder` to use for decoding. Defaults to a new instance.
+    /// - Returns: A decoded instance of type `T`.
+    /// - Throws: ``KeychainError/unexpectedError(_:)`` if the data cannot be decoded into the specified type.
+    /// - Throws: Any error thrown by ``KeychainStorageProtocol/get(_:)-2gcee`` if reading the raw data fails.
+    func get<T: Decodable>(
+        _ account: Account,
+        decoder: JSONDecoder = .init()
+    ) throws(KeychainError) -> T {
+        let value: Data = try get(account)
+        do {
+            return try decoder.decode(T.self, from: value)
+        } catch {
+            throw KeychainError.unexpectedError(error)
+        }
+    }
+    
+    /// Stores a UTF-8 encoded string in the keychain for the specified account.
+    ///
+    /// - Parameters:
+    ///   - value: The string to store.
+    ///   - account: The account identifier used as the key for storing the value.
+    /// - Throws: ``KeychainError/unexpectedData`` if the string cannot be encoded as UTF-8.
+    /// - Throws: Any error thrown by ``KeychainStorageProtocol/set(_:for:)-21dla``
+    ///   if saving the data fails.
+    func set(_ value: String, for account: Account) throws(KeychainError) {
+        guard let data = value.data(using: .utf8) else {
+            throw KeychainError.unexpectedData
+        }
+        try set(data, for: account)
+    }
+    
+    /// Stores a `UUID` value as a UTF-8 encoded string in the keychain for the specified account.
+    ///
+    /// - Parameters:
+    ///   - value: The UUID to store.
+    ///   - account: The account identifier used as the key for storing the value.
+    /// - Throws: Any error thrown by ``KeychainStorageProtocol/set(_:for:)-6nzkf``
+    ///   if saving the data fails.
+    func set(_ value: UUID, for account: Account) throws(KeychainError) {
+        try set(value.uuidString, for: account)
+    }
+    
+    /// Stores an `Encodable` value in the keychain as JSON-encoded data for the specified account.
+    ///
+    /// - Parameters:
+    ///   - value: The value to encode and store.
+    ///   - account: The account identifier used as the key for storing the value.
+    ///   - encoder: The JSON encoder to use (default is a new instance).
+    /// - Throws: ``KeychainError/unexpectedError(_:)`` if encoding the value fails.
+    /// - Throws: Any error thrown by ``KeychainStorageProtocol/set(_:for:)-21dla``
+    ///   if saving the data fails.
+    func set<T: Encodable>(
+        _ value: T,
+        for account: Account,
+        encoder: JSONEncoder = .init()
+    ) throws(KeychainError) {
+        do {
+            let data = try encoder.encode(value)
+            try set(data, for: account)
+        } catch let error as KeychainError {
+            throw error
+        } catch {
+            throw KeychainError.unexpectedError(error)
+        }
+    }
+}

@@ -20,17 +20,11 @@ import Security
 ///
 /// ### Retrieving Values
 ///
-/// - ``get(_:)-5u61a``
-/// - ``get(_:)-502rt``
-/// - ``get(_:)-63a3x``
-/// - ``get(_:decoder:)``
+/// - ``get(_:)``
 ///
 /// ### Storing Values
 ///
-/// - ``set(_:for:)-7053g``
-/// - ``set(_:for:)-99s6o``
-/// - ``set(_:for:)-2e1p6``
-/// - ``set(_:for:encoder:)``
+/// - ``set(_:for:)``
 ///
 /// ### Deleting Values
 ///
@@ -61,14 +55,15 @@ public final class KeychainStorage<
     
     // MARK: - Methods
     
-    /// Retrieves raw `Data` stored in Keychain for the specified account.
+    /// Retrieves raw `Data` stored in the keychain for the specified account.
     ///
-    /// - Parameter account: The account identifier conforming to `KeychainAccountProtocol`.
-    /// - Returns: The raw data associated with the given account.
-    /// - Throws: ``KeychainError/itemNotFound`` when no keychain item matches the query.
+    /// - Parameter account: The account identifier used to locate the stored value.
+    /// - Returns: The raw data associated with the specified account.
+    ///
+    /// - Throws: ``KeychainError/itemNotFound`` if no matching item is found in the keychain.
     /// - Throws: ``KeychainError/authenticationFailed`` if biometric or device authentication fails.
-    /// - Throws: ``KeychainError/unexpectedData`` if the stored data is missing or corrupted.
-    /// - Throws: ``KeychainError/unexpectedCode(_:)`` for any other OSStatus error returned by the Keychain API.
+    /// - Throws: ``KeychainError/unexpectedData`` if the retrieved data is missing or corrupted.
+    /// - Throws: ``KeychainError/unexpectedCode(_:)`` for any other unexpected OSStatus error.
     public func get(_ account: Account) throws(KeychainError) -> Data {
         var query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
@@ -105,67 +100,19 @@ public final class KeychainStorage<
         }
     }
     
-    /// Retrieves a UTF-8 encoded string stored in Keychain for the specified account.
+    /// Stores raw `Data` in the keychain for the specified account, replacing any existing value.
     ///
-    /// - Parameter account: The account identifier conforming to `KeychainAccountProtocol`.
-    /// - Returns: The stored string value associated with the account.
-    /// - Throws: ``KeychainError/itemNotFound`` when no keychain item matches the query.
-    /// - Throws: ``KeychainError/authenticationFailed`` if biometric or device authentication fails.
-    /// - Throws: ``KeychainError/unexpectedData`` if the stored data cannot be decoded as UTF-8.
-    /// - Throws: ``KeychainError/unexpectedCode(_:)`` for any other OSStatus error returned by the Keychain API.
-    public func get(_ account: Account) throws(KeychainError) -> String {
-        guard let value = String(data: try get(account), encoding: .utf8) else {
-            throw KeychainError.unexpectedData
-        }
-        return value
-    }
-    
-    /// Retrieves a `UUID` stored in Keychain for the specified account.
-    ///
-    /// - Parameter account: The account identifier conforming to `KeychainAccountProtocol`.
-    /// - Returns: The stored UUID value associated with the account.
-    /// - Throws: ``KeychainError/itemNotFound`` when no keychain item matches the query.
-    /// - Throws: ``KeychainError/authenticationFailed`` if biometric or device authentication fails.
-    /// - Throws: ``KeychainError/unexpectedData`` if the stored string is missing or is not a valid UUID.
-    /// - Throws: ``KeychainError/unexpectedCode(_:)`` for any other OSStatus error returned by the Keychain API.
-    public func get(_ account: Account) throws(KeychainError) -> UUID {
-        guard let value = UUID(uuidString: try get(account)) else {
-            throw KeychainError.unexpectedData
-        }
-        return value
-    }
-    
-    /// Retrieves a value of type `T` stored in Keychain, decoded from JSON using the provided decoder.
+    /// This method first deletes any existing keychain item for the account, then creates a new
+    /// item with the specified data and applies the access control settings from the account's
+    /// protection and flags.
     ///
     /// - Parameters:
+    ///   - value: The raw data to store.
     ///   - account: The account identifier conforming to `KeychainAccountProtocol`.
-    ///   - decoder: The `JSONDecoder` instance used to decode the data (default is a new instance).
-    /// - Returns: The decoded value of type `T`.
-    /// - Throws: ``KeychainError/itemNotFound`` when no keychain item matches the query.
-    /// - Throws: ``KeychainError/authenticationFailed`` if biometric or device authentication fails.
-    /// - Throws: ``KeychainError/unexpectedData`` if the stored data is missing or corrupted.
-    /// - Throws: ``KeychainError/unexpectedCode(_:)`` for any OSStatus error returned by the Keychain API.
-    /// - Throws: ``KeychainError/unexpectedError(_:)`` if decoding the data into `T` fails.
-    public func get<T: Decodable>(
-        _ account: Account,
-        decoder: JSONDecoder = .init()
-    ) throws(KeychainError) -> T {
-        let value: Data = try get(account)
-        do {
-            return try decoder.decode(T.self, from: value)
-        } catch {
-            throw KeychainError.unexpectedError(error)
-        }
-    }
-    
-    /// Stores raw `Data` in the Keychain for the specified account, replacing any existing value.
     ///
-    /// - Parameters:
-    ///   - value: The raw data to store in the Keychain.
-    ///   - account: The account identifier conforming to `KeychainAccountProtocol`.
     /// - Throws: ``KeychainError/unexpectedError(_:)`` if access control creation fails.
-    /// - Throws: ``KeychainError/unexpectedCode(_:)`` if adding the item to the Keychain fails.
-    /// - Throws: Any error thrown by ``delete(_:)`` if the previous value cannot be removed.
+    /// - Throws: ``KeychainError/unexpectedCode(_:)`` if adding the new item to the keychain fails.
+    /// - Throws: Any error thrown by ``delete(_:)`` if the existing item cannot be removed.
     public func set(_ value: Data, for account: Account) throws(KeychainError) {
         try delete(account)
         
@@ -197,61 +144,12 @@ public final class KeychainStorage<
         }
     }
     
-    /// Stores a UTF-8 encoded string in the Keychain for the specified account.
+    /// Deletes the keychain item associated with the specified account.
     ///
-    /// - Parameters:
-    ///   - value: The string value to store.
-    ///   - account: The account identifier conforming to `KeychainAccountProtocol`.
-    /// - Throws: ``KeychainError/unexpectedError(_:)`` if access control creation fails.
-    /// - Throws: ``KeychainError/unexpectedCode(_:)`` if adding the item to the Keychain fails.
-    /// - Throws: Any error thrown by ``set(_:for:)-7053g`` if encoding or insertion fails.
-    public func set(_ value: String, for account: Account) throws(KeychainError) {
-        try set(value.data(using: .utf8)!, for: account)
-    }
-    
-    /// Stores a `UUID` value as a string in the Keychain for the specified account.
-    ///
-    /// - Parameters:
-    ///   - value: The UUID value to store.
-    ///   - account: The account identifier conforming to `KeychainAccountProtocol`.
-    /// - Throws: ``KeychainError/unexpectedError(_:)`` if access control creation fails.
-    /// - Throws: ``KeychainError/unexpectedCode(_:)`` if adding the item to the Keychain fails.
-    /// - Throws: Any error thrown by ``set(_:for:)-7053g`` if encoding or insertion fails.
-    public func set(_ value: UUID, for account: Account) throws(KeychainError) {
-        try set(value.uuidString, for: account)
-    }
-    
-    /// Stores an `Encodable` value in the Keychain as JSON-encoded data for the specified account.
-    ///
-    /// - Parameters:
-    ///   - value: The value to encode and store.
-    ///   - account: The account identifier conforming to `KeychainAccountProtocol`.
-    ///   - encoder: The `JSONEncoder` to use for encoding the value (default is a new instance).
-    /// - Throws: ``KeychainError/unexpectedError(_:)`` if encoding fails.
-    /// - Throws: ``KeychainError/unexpectedError(_:)`` if access control creation fails.
-    /// - Throws: ``KeychainError/unexpectedCode(_:)`` if adding the item to the Keychain fails.
-    /// - Throws: Any error thrown by ``set(_:for:)-7053g`` if insertion fails.
-    public func set<T: Encodable>(
-        _ value: T,
-        for account: Account,
-        encoder: JSONEncoder = .init()
-    ) throws(KeychainError) {
-        do {
-            let data = try encoder.encode(value)
-            try set(data, for: account)
-        } catch let error as KeychainError {
-            throw error
-        } catch {
-            throw KeychainError.unexpectedError(error)
-        }
-    }
-    
-    /// Deletes the item associated with the specified account from the Keychain.
-    ///
-    /// If no item exists for the given account, the method does nothing and does not throw an error.
+    /// If no item exists for the given account, this method completes silently without error.
     ///
     /// - Parameter account: The account identifier conforming to `KeychainAccountProtocol`.
-    /// - Throws: ``KeychainError/unexpectedCode(_:)`` if deletion fails with an unexpected OSStatus.
+    /// - Throws: ``KeychainError/unexpectedCode(_:)`` if the deletion fails with an unexpected OSStatus.
     public func delete(_ account: Account) throws(KeychainError) {
         var query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
