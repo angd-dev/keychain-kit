@@ -37,6 +37,10 @@ import Foundation
 /// ### Deleting Values
 ///
 /// - ``delete(_:)``
+///
+/// ### Exists Values
+///
+/// - ``exists(_:)``
 public protocol KeychainStorageProtocol {
     /// A type that describes a keychain account and its security configuration.
     associatedtype Account: KeychainAccountProtocol
@@ -121,6 +125,13 @@ public protocol KeychainStorageProtocol {
     /// - Note: If the item does not exist, the method completes silently without error.
     /// - Throws: An error only if the item exists but removal fails.
     func delete(_ account: Account) throws(KeychainError)
+    
+    /// Checks whether a keychain item exists for the specified account.
+    ///
+    /// - Parameter account: The keychain account to check for existence.
+    /// - Returns: `true` if an item exists in the keychain for the given account; otherwise, `false`.
+    /// - Throws: An error if access is denied, or another keychain error occurs.
+    func exists(_ account: Account) throws(KeychainError) -> Bool
 }
 
 public extension KeychainStorageProtocol {

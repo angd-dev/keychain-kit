@@ -29,6 +29,10 @@ import Security
 /// ### Deleting Values
 ///
 /// - ``delete(_:)``
+///
+/// ### Exists Values
+///
+/// - ``exists(_:)``
 public final class KeychainStorage<
     Account: KeychainAccountProtocol,
     Service: KeychainServiceProtocol
@@ -164,6 +168,46 @@ public final class KeychainStorage<
         
         let status = SecItemDelete(query as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw KeychainError.unexpectedCode(status)
+        }
+    }
+    
+    /// Checks whether a keychain item exists for the specified account.
+    ///
+    /// This method performs a lookup in the keychain using the account's identity and
+    /// associated service context without returning the stored value. It can be used
+    /// to quickly determine if a keychain entry is present before attempting retrieval.
+    ///
+    /// - Parameter account: The keychain account to check for existence.
+    /// - Returns: `true` if an item exists in the keychain for the given account; otherwise, `false`.
+    /// - Throws: ``KeychainError/authenticationFailed`` if the check requires authentication
+    ///   (for example, the item is protected with biometrics or a passcode and no authentication
+    ///   context is provided).
+    /// - Throws: ``KeychainError/unexpectedCode(_:)`` for any other OSStatus returned by the
+    ///   Security framework.
+    public func exists(_ account: Account) throws(KeychainError) -> Bool {
+        var query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrAccount: account.identifier,
+            kSecAttrSynchronizable: account.synchronizable,
+            kSecUseDataProtectionKeychain: true,
+            kSecMatchLimit: kSecMatchLimitOne,
+            kSecReturnAttributes: false,
+            kSecReturnData: false
+        ]
+        
+        query[kSecAttrService] = service?.identifier
+        query[kSecAttrAccessGroup] = service?.accessGroup
+        query[kSecUseAuthenticationContext] = context
+        
+        switch SecItemCopyMatching(query as CFDictionary, nil) {
+        case errSecSuccess:
+            return true
+        case errSecItemNotFound:
+            return false
+        case errSecAuthFailed, errSecInteractionNotAllowed:
+            throw KeychainError.authenticationFailed
+        case let status:
             throw KeychainError.unexpectedCode(status)
         }
     }
