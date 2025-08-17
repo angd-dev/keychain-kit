@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Types conforming to this protocol provide metadata for configuring secure storage
 /// and access behavior for keychain items.
-public protocol KeychainAccountProtocol {
+public protocol KeychainAccountProtocol: Sendable {
     /// A unique string used to identify the keychain account.
     var identifier: String { get }
     

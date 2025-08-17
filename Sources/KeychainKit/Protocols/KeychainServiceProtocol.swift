@@ -4,7 +4,7 @@ import Foundation
 ///
 /// Types conforming to this protocol provide an identifier used to distinguish stored items
 /// and may optionally specify an access group to enable keychain sharing between apps.
-public protocol KeychainServiceProtocol {
+public protocol KeychainServiceProtocol: Sendable {
     /// A unique string used to identify the keychain service.
     var identifier: String { get }
 
