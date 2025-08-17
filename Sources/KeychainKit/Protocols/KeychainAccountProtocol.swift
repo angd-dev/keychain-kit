@@ -1,47 +1,53 @@
 import Foundation
 
-/// A protocol that defines the required properties for a keychain account descriptor.
+/// A type that describes a keychain account configuration for secure item storage and access.
 ///
-/// Types conforming to this protocol provide metadata for configuring secure storage
-/// and access behavior for keychain items.
-public protocol KeychainAccountProtocol {
-    /// A unique string used to identify the keychain account.
+/// Conforming types define metadata that determines how the keychain protects, authenticates, and
+/// optionally synchronizes specific items.
+///
+/// ## Topics
+///
+/// ### Properties
+///
+/// - ``identifier``
+/// - ``protection``
+/// - ``accessFlags``
+/// - ``synchronizable``
+public protocol KeychainAccountProtocol: Sendable {
+    /// A unique string that identifies the keychain account.
     var identifier: String { get }
     
-    /// The keychain data protection level for the account.
+    /// The keychain data protection level assigned to the account.
     ///
-    /// Defaults to `kSecAttrAccessibleAfterFirstUnlock`. You may override it to use other
-    /// accessibility levels, such as `kSecAttrAccessibleWhenUnlocked`
-    /// or `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly`.
+    /// Defaults to `kSecAttrAccessibleAfterFirstUnlock`. You can override this to use another
+    /// accessibility option, such as `kSecAttrAccessibleWhenUnlocked` or
+    /// `kSecAttrAccessibleWhenPasscodeSetThisDeviceOnly`.
     var protection: CFString { get }
     
-    /// The access control flags used to define authentication requirements.
+    /// The access control flags defining additional authentication requirements.
     ///
-    /// Defaults to `[]` (no additional access control). Can be overridden to specify
-    /// constraints such as `.userPresence`, `.biometryAny`, or `.devicePasscode`.
+    /// Defaults to an empty set (`[]`). Override this to enforce constraints like `.userPresence`,
+    /// `.biometryAny`, or `.devicePasscode`.
     var accessFlags: SecAccessControlCreateFlags { get }
     
-    /// Whether the item should be marked as synchronizable via iCloud Keychain.
+    /// Indicates whether the item is synchronized through iCloud Keychain.
     ///
-    /// Defaults to `false`. Set to `true` if the item should sync across devices.
+    /// Defaults to `false`. Set this to `true` if the item should be available across all devices
+    /// associated with the same iCloud account.
     var synchronizable: Bool { get }
 }
 
 public extension KeychainAccountProtocol {
-    /// Default value for `protection`: accessible after first unlock.
     var protection: CFString { kSecAttrAccessibleAfterFirstUnlock }
     
-    /// Default value for `accessFlags`: no access control constraints.
     var accessFlags: SecAccessControlCreateFlags { [] }
     
-    /// Default value for `synchronizable`: not synchronized across devices.
     var synchronizable: Bool { false }
 }
 
 public extension KeychainAccountProtocol where Self: RawRepresentable, Self.RawValue == String {
-    /// Provides a default `identifier` implementation for `RawRepresentable` types
-    /// whose `RawValue` is `String`.
+    /// A unique string that identifies the keychain account.
     ///
-    /// The `identifier` is derived from the raw string value.
+    /// Derived from the instance’s raw string value.
     var identifier: String { rawValue }
 }

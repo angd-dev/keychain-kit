@@ -10,11 +10,6 @@ It supports optional authentication via `LAContext`, allowing integration with F
 
 KeychainKit does not hide the complexity of Keychain operations but provides a clean API and convenient error handling via a custom `KeychainError` type.
 
-## Requirements
-
-- **Swift**: 5.10+
-- **Platforms**: macOS 10.15+, iOS 13.0+
-
 ## Installation
 
 To add KeychainKit to your project, use Swift Package Manager (SPM).
@@ -24,7 +19,7 @@ To add KeychainKit to your project, use Swift Package Manager (SPM).
 1. Open your project in Xcode.
 2. Navigate to the `File` menu and select `Add Package Dependencies`.
 3. Enter the repository URL: `https://github.com/angd-dev/keychain-kit.git`
-4. Choose the version to install (e.g., `2.1.0`).
+4. Choose the version to install (e.g., `3.0.0`).
 5. Add the library to your target module.
 
 ### Adding to Package.swift
@@ -38,7 +33,7 @@ import PackageDescription
 let package = Package(
     name: "YourProject",
     dependencies: [
-        .package(url: "https://github.com/angd-dev/keychain-kit.git", from: "2.1.0")
+        .package(url: "https://github.com/angd-dev/keychain-kit.git", from: "3.0.0")
     ],
     targets: [
         .target(
@@ -53,7 +48,7 @@ let package = Package(
 
 ## Additional Resources
 
-For more information and usage examples, see the [documentation](https://docs.angd.dev/?package=keychain-kit&version=2.1.0).
+For more information and usage examples, see the [documentation](https://docs.angd.dev/?package=keychain-kit&version=3.0.0).
 
 ## License
 
