@@ -8,15 +8,21 @@ let package = Package(
     defaultLocalization: "en",
     platforms: [.macOS(.v12), .iOS(.v15)],
     products: [
-        .library(name: "KeychainKit", targets: ["KeychainKit"]),
+        .library(name: "KeychainKit", targets: ["KeychainKit"])
     ],
     dependencies: [
         .package(url: "https://github.com/angd-dev/localizable.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0")
     ],
     targets: [
-        .target(name: "KeychainKit", dependencies: [
-            .product(name: "Localizable", package: "localizable")
-        ])
+        .target(
+            name: "KeychainKit",
+            dependencies: [
+                .product(name: "Localizable", package: "localizable")
+            ],
+            resources: [
+                .process("Resources/Localizable.xcstrings")
+            ]
+        )
     ]
 )
