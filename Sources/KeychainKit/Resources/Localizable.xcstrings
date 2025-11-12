@@ -1,0 +1,56 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "Error.authenticationFailed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Authentication failed"
+          }
+        }
+      }
+    },
+    "Error.duplicateItem" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Item already exists"
+          }
+        }
+      }
+    },
+    "Error.invalidData" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stored item contains invalid or unexpected data"
+          }
+        }
+      }
+    },
+    "Error.osStatus %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unexpected Keychain status: %@"
+          }
+        }
+      }
+    },
+    "Error.underlying %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unexpected error while working with Keychain: %@"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
