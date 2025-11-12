@@ -2,10 +2,11 @@ import Foundation
 import LocalAuthentication
 import Security
 
-/// A type-safe storage abstraction over the Keychain service.
+/// A service that provides access and management for keychain items.
 ///
-/// Supports storing, retrieving, and deleting generic data associated with
-/// accounts and services, with optional local authentication context support.
+/// This type provides direct access to the system keychain using `Security` and
+/// `LocalAuthentication` frameworks. It supports querying, inserting, deleting, and checking item
+/// existence, while handling authentication contexts and access controls automatically.
 ///
 /// ## Topics
 ///
@@ -18,36 +19,31 @@ import Security
 /// - ``service``
 /// - ``context``
 ///
-/// ### Retrieving Values
+/// ### Instance Methods
 ///
-/// - ``get(_:)``
-///
-/// ### Storing Values
-///
-/// - ``set(_:for:)``
-///
-/// ### Deleting Values
-///
-/// - ``delete(_:)``
+/// - ``get(by:)->Data?``
+/// - ``insert(_:by:)-(Data,_)``
+/// - ``delete(by:)``
+/// - ``exists(by:)``
 public final class KeychainStorage<
     Account: KeychainAccountProtocol,
     Service: KeychainServiceProtocol
->: KeychainStorageProtocol {
+>: KeychainStorageProtocol, @unchecked Sendable {
     // MARK: - Properties
     
-    /// The service metadata associated with this Keychain storage instance.
+    /// The service descriptor associated with this keychain storage.
     public let service: Service?
     
-    /// An optional local authentication context used for biometric or passcode protection.
+    /// The authentication context used for keychain operations.
     public let context: LAContext?
     
-    // MARK: - Inits
+    // MARK: - Initialization
     
-    /// Creates a new `KeychainStorage` instance with the given service and authentication context.
+    /// Creates a new keychain storage instance.
     ///
     /// - Parameters:
-    ///   - service: An optional `Service` instance representing the keychain service metadata.
-    ///   - context: An optional `LAContext` instance for authentication protection.
+    ///   - service: The service descriptor that defines the keychain group and access settings.
+    ///   - context: The authentication context used for secure access, or `nil` to use a default one.
     public init(service: Service?, context: LAContext?) {
         self.service = service
         self.context = context
@@ -55,23 +51,20 @@ public final class KeychainStorage<
     
     // MARK: - Methods
     
-    /// Retrieves raw `Data` stored in the keychain for the specified account.
+    /// Retrieves raw data for the given account.
     ///
-    /// - Parameter account: The account identifier used to locate the stored value.
-    /// - Returns: The raw data associated with the specified account.
-    ///
-    /// - Throws: ``KeychainError/itemNotFound`` if no matching item is found in the keychain.
-    /// - Throws: ``KeychainError/authenticationFailed`` if biometric or device authentication fails.
-    /// - Throws: ``KeychainError/unexpectedData`` if the retrieved data is missing or corrupted.
-    /// - Throws: ``KeychainError/unexpectedCode(_:)`` for any other unexpected OSStatus error.
-    public func get(_ account: Account) throws(KeychainError) -> Data {
+    /// - Parameter account: The account descriptor identifying the stored item.
+    /// - Returns: The stored data, or `nil` if no item exists.
+    /// - Throws: ``KeychainError/invalidData`` if the retrieved value cannot be cast to `Data`.
+    /// - Throws: ``KeychainError/authenticationFailed`` if user authentication fails.
+    /// - Throws: ``KeychainError/osStatus(_:)`` for unexpected system errors.
+    public func get(by account: Account) throws(KeychainError) -> Data? {
         var query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrAccount: account.identifier,
             kSecAttrSynchronizable: account.synchronizable,
             kSecUseDataProtectionKeychain: true,
             kSecMatchLimit: kSecMatchLimitOne,
-            kSecReturnAttributes: true,
             kSecReturnData: true
         ]
         
@@ -79,50 +72,41 @@ public final class KeychainStorage<
         query[kSecAttrAccessGroup] = service?.accessGroup
         query[kSecUseAuthenticationContext] = context
         
-        var queryResult: AnyObject?
-        let status = withUnsafeMutablePointer(to: &queryResult) {
-            SecItemCopyMatching(query as CFDictionary, UnsafeMutablePointer($0))
-        }
+        var result: AnyObject?
         
-        switch status {
+        switch SecItemCopyMatching(query as CFDictionary, &result) {
         case errSecSuccess:
-            guard
-                let item = queryResult as? [CFString : AnyObject],
-                let data = item[kSecValueData] as? Data
-            else { throw KeychainError.unexpectedData }
-            return data
+            if let data = result as? Data {
+                return data
+            } else {
+                throw .invalidData
+            }
         case errSecItemNotFound:
-            throw KeychainError.itemNotFound
-        case errSecAuthFailed:
-            throw KeychainError.authenticationFailed
-        default:
-            throw KeychainError.unexpectedCode(status)
+            return nil
+        case errSecAuthFailed, errSecInteractionNotAllowed, errSecUserCanceled:
+            throw .authenticationFailed
+        case let status:
+            throw .osStatus(status)
         }
     }
     
-    /// Stores raw `Data` in the keychain for the specified account, replacing any existing value.
-    ///
-    /// This method first deletes any existing keychain item for the account, then creates a new
-    /// item with the specified data and applies the access control settings from the account's
-    /// protection and flags.
+    /// Inserts raw data for the given account.
     ///
     /// - Parameters:
-    ///   - value: The raw data to store.
-    ///   - account: The account identifier conforming to `KeychainAccountProtocol`.
-    ///
-    /// - Throws: ``KeychainError/unexpectedError(_:)`` if access control creation fails.
-    /// - Throws: ``KeychainError/unexpectedCode(_:)`` if adding the new item to the keychain fails.
-    /// - Throws: Any error thrown by ``delete(_:)`` if the existing item cannot be removed.
-    public func set(_ value: Data, for account: Account) throws(KeychainError) {
-        try delete(account)
-        
+    ///   - value: The data to store.
+    ///   - account: The account descriptor identifying the target item.
+    /// - Throws: ``KeychainError/underlying(_:)`` if access control creation fails.
+    /// - Throws: ``KeychainError/duplicateItem`` if an item with the same key already exists.
+    /// - Throws: ``KeychainError/osStatus(_:)`` for unexpected system errors.
+    public func insert(_ value: Data, by account: Account) throws(KeychainError) {
         var error: Unmanaged<CFError>?
         let access = SecAccessControlCreateWithFlags(
             nil, account.protection, account.accessFlags, &error
         )
         
         guard let access else {
-            throw KeychainError.unexpectedError(error?.takeUnretainedValue())
+            let error = error?.takeRetainedValue()
+            throw .underlying(error as? NSError)
         }
         
         var query: [CFString: Any] = [
@@ -138,19 +122,22 @@ public final class KeychainStorage<
         query[kSecAttrAccessGroup] = service?.accessGroup
         query[kSecUseAuthenticationContext] = context
         
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == noErr else {
-            throw KeychainError.unexpectedCode(status)
+        switch SecItemAdd(query as CFDictionary, nil) {
+        case errSecSuccess:
+            return
+        case errSecDuplicateItem:
+            throw .duplicateItem
+        case let status:
+            throw .osStatus(status)
         }
     }
     
-    /// Deletes the keychain item associated with the specified account.
+    /// Deletes the item for the given account.
     ///
-    /// If no item exists for the given account, this method completes silently without error.
-    ///
-    /// - Parameter account: The account identifier conforming to `KeychainAccountProtocol`.
-    /// - Throws: ``KeychainError/unexpectedCode(_:)`` if the deletion fails with an unexpected OSStatus.
-    public func delete(_ account: Account) throws(KeychainError) {
+    /// - Parameter account: The account descriptor identifying the item to remove.
+    /// - Throws: ``KeychainError/authenticationFailed`` if user authentication fails.
+    /// - Throws: ``KeychainError/osStatus(_:)`` for unexpected system errors.
+    public func delete(by account: Account) throws(KeychainError) {
         var query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrAccount: account.identifier,
@@ -162,9 +149,45 @@ public final class KeychainStorage<
         query[kSecAttrAccessGroup] = service?.accessGroup
         query[kSecUseAuthenticationContext] = context
         
-        let status = SecItemDelete(query as CFDictionary)
-        guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw KeychainError.unexpectedCode(status)
+        switch SecItemDelete(query as CFDictionary) {
+        case errSecSuccess, errSecItemNotFound:
+            return
+        case errSecAuthFailed, errSecInteractionNotAllowed, errSecUserCanceled:
+            throw .authenticationFailed
+        case let status:
+            throw .osStatus(status)
+        }
+    }
+    
+    /// Checks whether an item exists for the given account.
+    ///
+    /// - Parameter account: The account descriptor identifying the stored item.
+    /// - Returns: `true` if the item exists; otherwise, `false`.
+    /// - Throws: ``KeychainError/osStatus(_:)`` for unexpected system errors.
+    public func exists(by account: Account) throws(KeychainError) -> Bool {
+        var query: [CFString: Any] = [
+            kSecClass: kSecClassGenericPassword,
+            kSecAttrAccount: account.identifier,
+            kSecAttrSynchronizable: account.synchronizable,
+            kSecUseDataProtectionKeychain: true,
+            kSecMatchLimit: kSecMatchLimitOne,
+            kSecReturnData: false
+        ]
+        
+        let context = LAContext()
+        context.interactionNotAllowed = true
+        
+        query[kSecAttrService] = service?.identifier
+        query[kSecAttrAccessGroup] = service?.accessGroup
+        query[kSecUseAuthenticationContext] = context
+        
+        switch SecItemCopyMatching(query as CFDictionary, nil) {
+        case errSecSuccess, errSecAuthFailed, errSecInteractionNotAllowed:
+            return true
+        case errSecItemNotFound:
+            return false
+        case let status:
+            throw .osStatus(status)
         }
     }
 }

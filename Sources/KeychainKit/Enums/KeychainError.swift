@@ -1,41 +1,44 @@
 import Foundation
 
-/// Errors that can occur during Keychain operations.
+/// An error that represents a keychain operation failure.
+///
+/// Each case corresponds to a specific system or data error encountered while performing keychain
+/// operations.
 public enum KeychainError: Error, Equatable {
-    /// Authentication failed, e.g., due to biometric or passcode denial.
+    /// Authentication was required but failed or was canceled.
     case authenticationFailed
-    /// No item found matching the query.
-    case itemNotFound
-    /// Unexpected or corrupted data found in Keychain item.
-    case unexpectedData
-    /// An unexpected OSStatus error code returned by Keychain API.
-    case unexpectedCode(OSStatus)
-    /// A generic unexpected error, with optional underlying error info.
-    case unexpectedError(Error?)
     
-    /// Compares two `KeychainError` values for equality.
+    /// An item with the same key already exists in the keychain.
+    case duplicateItem
+    
+    /// The stored or retrieved data has an invalid format.
+    case invalidData
+    
+    /// An unexpected system status code was returned.
     ///
-    /// - Parameters:
-    ///   - lhs: The first `KeychainError` to compare.
-    ///   - rhs: The second `KeychainError` to compare.
-    /// - Returns: `true` if both errors are of the same case and represent the same error details.
+    /// - Parameter status: The underlying `OSStatus` value.
+    case osStatus(OSStatus)
+    
+    /// A lower-level error occurred during encoding, decoding, or other processing.
     ///
-    /// For `.unexpectedError`, the comparison is based on the underlying `NSError` identity,
-    /// which includes domain and error code.
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        switch (lhs, rhs) {
-        case (.authenticationFailed, .authenticationFailed):
-            true
-        case (.itemNotFound, .itemNotFound):
-            true
-        case (.unexpectedData, .unexpectedData):
-            true
-        case (.unexpectedCode(let lCode), .unexpectedCode(let rCode)):
-            lCode == rCode
-        case (.unexpectedError(let lErr), .unexpectedError(let rErr)):
-            lErr as NSError? == rErr as NSError?
-        default:
-            false
+    /// - Parameter error: The underlying Foundation error, if available.
+    case underlying(NSError?)
+    
+    /// A localized, human-readable description of the error.
+    public var localizedDescription: String {
+        switch self {
+        case .authenticationFailed:
+            return .Error.authenticationFailed
+        case .duplicateItem:
+            return .Error.duplicateItem
+        case .invalidData:
+            return .Error.invalidData
+        case .osStatus(let status):
+            let message = SecCopyErrorMessageString(status, nil)
+            return .Error.osStatus(message as? String ?? "")
+        case .underlying(let error):
+            let message = error?.localizedDescription
+            return .Error.underlying(message ?? "")
         }
     }
 }
